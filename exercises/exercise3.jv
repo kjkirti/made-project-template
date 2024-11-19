@@ -1,0 +1,94 @@
+pipeline CountryStatsPipeline {
+
+    DataExtractor
+        -> ExcelInterpreter
+        -> SheetPicker
+        -> HeaderRenamer
+        -> CellRangeSelector
+        -> BondIssuanceTableInterpreter
+        -> BondIssuanceLoader;
+
+        CellRangeSelector ->
+        GDPPerCapitaTableInterpreter
+        -> GDPPerCapitaLoader;
+
+
+ block HeaderRenamer oftype CellWriter {
+        at: range P2:S2;
+        write: [
+            "Country Code",
+            "Economy",
+            "GDP per Capita",
+            "Bond Issuance Share"
+        ];
+    }
+
+
+    block DataExtractor oftype HttpExtractor {
+        url: "https://thedocs.worldbank.org/en/doc/7d852628d96b9411d43e5d36d5dff941-0050062022/original/Graphs-Chapter-5-02082022.xlsx";
+    }
+
+
+    block ExcelInterpreter oftype XLSXInterpreter { }
+
+
+    block SheetPicker oftype SheetPicker {
+        sheetName: "Figure S5.1.2";
+    }
+
+
+    block CellRangeSelector oftype CellRangeSelector {
+        select: range P2:S45;
+    }
+
+    
+    valuetype ValidCountryCode oftype text {
+        constraints: [iso];
+    }
+
+    constraint iso oftype RegexConstraint {
+        regex: /^[A-Z]{3}$/;
+    }
+
+    valuetype PositiveDecimal oftype decimal {
+        constraints: [PositiveDecimalConstraint];
+    }
+
+    constraint PositiveDecimalConstraint on decimal :
+        value > 0;
+    
+
+    valuetype BondShare oftype decimal {
+        constraints: [BondShareConstraint];
+    }
+
+    constraint BondShareConstraint on decimal :
+        value >= 0 and value <= 1;
+    
+
+    block BondIssuanceTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            "Country Code" oftype ValidCountryCode,
+            "Bond Issuance Share" oftype BondShare
+        ];
+    }
+
+    block BondIssuanceLoader oftype SQLiteLoader {
+        table: "bondIssuance";
+        file: "country-stats.sqlite";
+    }
+
+    block GDPPerCapitaTableInterpreter oftype TableInterpreter {
+        header: true;
+        columns: [
+            "Country Code" oftype ValidCountryCode,
+            "GDP per Capita" oftype PositiveDecimal
+        ];
+    }
+
+    block GDPPerCapitaLoader oftype SQLiteLoader {
+        table: "gdpPerCapita";
+        file: "country-stats.sqlite";
+    }
+}
