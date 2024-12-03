@@ -1,0 +1,113 @@
+pipeline BatteryTemperaturePipeline {
+    TemperatureZipExtractor 
+        -> TemperatureArchiveInterpreter
+        -> TemperatureFilePicker
+        -> TemperaturTextFileInterpreter
+        -> TemperatureCsvInterpreter
+        -> TemperatureColumnCleaner
+        -> TemperatureHeaderTranslation
+        -> TemperatureTableInterpreter
+        -> TemperatureConverter
+        -> BatteryTemperatureConverter
+        -> TemperatureLoader;
+
+    // HTTP URL Access: Downloads the zip file from a given URL
+    block TemperatureZipExtractor oftype HttpExtractor {
+        url: "https://www.mowesta.com/data/measure/mowesta-dataset-20221107.zip";
+    }
+
+    // Interprets the downloaded archive file as a ZIP file
+    block TemperatureArchiveInterpreter oftype ArchiveInterpreter {
+        archiveType : "zip";
+    }
+
+    // Picks the specific file `data.csv` from the extracted archive
+    block TemperatureFilePicker oftype FilePicker {
+        path : "./data.csv";
+    }
+
+    // Interprets the selected file as a text file
+    block TemperaturTextFileInterpreter oftype TextFileInterpreter {}
+
+    // Converts the text file into a CSV structure with a specified delimiter
+    block TemperatureCsvInterpreter oftype CSVInterpreter {
+        delimiter : ";";
+    }
+
+    // Deletes unnecessary columns (columns F, G, H, I) from the dataset
+    block TemperatureColumnCleaner oftype ColumnDeleter {
+        delete: [column F, column G, column H, column I];
+    }
+
+    // Renames the header row (row 1) to match the desired column names
+    block TemperatureHeaderTranslation oftype CellWriter {
+        at: range A1:F1;
+        write: ["id", "producer", "model", "month", "temperature", "battery_temperature"];
+    }
+
+    // Interprets the sheet data as a table with specific data types for each column
+    block TemperatureTableInterpreter oftype TableInterpreter {
+        header : true; // Indicates the presence of a header row
+        columns : [
+            "id" oftype DeviceId,                
+            "producer" oftype text,             
+            "model" oftype text,                
+            "month" oftype Month,               
+            "temperature" oftype decimal,       
+            "battery_temperature" oftype decimal 
+        ];
+    }
+
+    // Converts the `temperature` column from Celsius to Fahrenheit
+    block TemperatureConverter oftype TableTransformer {
+        inputColumns: ["temperature"]; 
+        outputColumn: "temperature";   
+        uses: CelsiusToFahrenheit;     
+    }
+
+    // Converts the `battery_temperature` column from Celsius to Fahrenheit
+    block BatteryTemperatureConverter oftype TableTransformer {
+        inputColumns: ["battery_temperature"]; 
+        outputColumn: "battery_temperature";   
+        uses: CelsiusToFahrenheit;             
+    }
+
+    // Loads the final processed table into an SQLite database
+    block TemperatureLoader oftype SQLiteLoader {
+        table : "temperatures";       
+        file : "./temperatures.sqlite"; 
+    }
+
+    // Transformation block to convert Celsius to Fahrenheit
+    transform CelsiusToFahrenheit {
+        from tempCelsius oftype decimal;       
+        to tempFahrenheit oftype decimal;     
+        tempFahrenheit: (tempCelsius * 9/5) + 32;
+    }   
+
+    // Custom data type for Device ID: must be an integer greater than 0
+    valuetype DeviceId oftype integer {
+        constraints : [
+            PositiveInteger  
+        ];
+    }
+
+    // Constraint: Ensures Device ID is greater than 0
+    constraint PositiveInteger oftype RangeConstraint {
+        lowerBound: 0;              
+        lowerBoundInclusive : false; 
+    }
+
+    // Custom data type for Month: must be an integer between 0 and 12
+    valuetype Month oftype integer {
+        constraints : [
+            MonthConstraint 
+        ];
+    }
+
+    // Constraint: Ensures Month is between 0 and 12
+    constraint MonthConstraint oftype RangeConstraint {
+        lowerBound : 0; 
+        upperBound : 12; 
+    }
+}
