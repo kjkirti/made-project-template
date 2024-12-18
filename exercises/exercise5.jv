@@ -1,0 +1,79 @@
+// Define a constraint AngleRange to ensure the angle is within a valid range (-90 to 90 degrees).
+constraint AngleRange oftype RangeConstraint {
+    lowerBound: -90;
+    lowerBoundInclusive: true;
+    upperBound: 90;
+    upperBoundInclusive: true;
+}
+
+// Define a valuetype Coordinates as a decimal constrained by AngleRange to represent geographical coordinates.
+valuetype Coordinates oftype decimal {
+    constraints: [AngleRange];
+}
+
+// Define a constraint only1925 to enforce a specific value (1925) for zone IDs.
+constraint only1925 oftype RangeConstraint {
+    lowerBound: 1925;
+    upperBound: 1925;
+}
+
+// Define a valuetype Zones as an integer constrained by only1925 for representing specific zones.
+valuetype Zones oftype integer {
+    constraints: [only1925];
+}
+
+// Begin the pipeline definition named exercise5.
+pipeline exercise5
+{
+
+    // Block to fetch data from the given URL, specified as an HttpExtractor.
+    block exercise5Extractor oftype HttpExtractor {
+        url: "https://gtfs.rhoenenergie-bus.de/GTFS.zip";
+    }
+
+    // Block to interpret the fetched data as a zip archive.
+    block exercise5ZipInterpreter oftype ArchiveInterpreter {
+        archiveType: "zip";
+    }
+
+    // Block to pick a specific file ('/stops.txt') from the extracted archive.
+    block exercise5FilePick oftype FilePicker {
+        path: "/stops.txt";
+    }
+
+    // Block to interpret the selected file as a plain text file.
+    block exercise5TextFileInterpreter oftype TextFileInterpreter {}
+
+    // Block to interpret the plain text file as a CSV file, with specific enclosing characters.
+    block exercise5CSVInterpreter oftype CSVInterpreter {
+        enclosing: '"';
+        enclosingEscape: '"';
+    }
+
+    // Block to parse the CSV file into a tabular format with predefined column types and constraints.
+    block exercise5TableInterpreter oftype TableInterpreter {
+        header: true; 
+        columns: [
+            "stop_id" oftype integer,        
+            "stop_name" oftype text,       
+            "stop_lat" oftype Coordinates,  
+            "stop_lon" oftype Coordinates,  
+            "zone_id" oftype Zones,         
+        ];
+    }
+
+    // Block to load the parsed data into an SQLite database, storing it in the 'stops' table.
+    block exercise5SQLLoader oftype SQLiteLoader {
+        table: "stops";
+        file: "./gtfs.sqlite"; 
+    }
+
+    // Define the data flow through the pipeline, starting from the extractor and ending at the loader.
+    exercise5Extractor
+        -> exercise5ZipInterpreter
+        -> exercise5FilePick
+        -> exercise5TextFileInterpreter
+        -> exercise5CSVInterpreter
+        -> exercise5TableInterpreter
+        -> exercise5SQLLoader;
+}
