@@ -1,0 +1,37 @@
+name: Run Project Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout the repository
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # Set up Python
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    # Install dependencies
+    - name: Install dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip install pandas pytest kaggle
+      working-directory: ./project
+
+    - name: Run pipeline
+      run: |
+        python3 ./project/pipeline.py
+
+    - name: Run test
+      run: |
+        python3 ./project/tests.py
