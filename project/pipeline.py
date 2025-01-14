@@ -1,61 +1,97 @@
-import os
 import pandas as pd
-import requests
-from zipfile import ZipFile
-from io import BytesIO
+import os
+from kaggle.api.kaggle_api_extended import KaggleApi
 
-# Define the URLs for the datasets
-dataset_urls = [
-    "https://www.kaggle.com/datasets/mathchi/diabetes-data-set",
-    "https://www.kaggle.com/datasets/cdc/chronic-disease"
-]
+def download_kaggle_datasets():
+    """
+    Download Kaggle datasets and return file paths.
+    """
+    alcohol_dataset = "annafabris/alcohol-consumption-by-state-2024"
+    chronic_dataset = "cdc/chronic-disease"
+    
+    download_dir = "./data"
+    if not os.path.exists(download_dir):
+        os.makedirs(download_dir)
 
-# Directory to save data
-output_dir = './data'
-os.makedirs(output_dir, exist_ok=True)
+    api = KaggleApi()
+    api.authenticate()
 
-def download_and_extract_kaggle_dataset(url, output_directory):
-    # This is a placeholder for Kaggle dataset download.
-    print(f"Please manually download the dataset from {url} due to API restrictions.")
-    print("Place the unzipped files in the output directory specified.")
+    api.dataset_download_files(alcohol_dataset, path=download_dir, unzip=True)
+    api.dataset_download_files(chronic_dataset, path=download_dir, unzip=True)
 
-def clean_and_transform_data(file_path):
-    # Load CSV/Excel file
-    if file_path.endswith('.csv'):
-        df = pd.read_csv(file_path)
-    elif file_path.endswith('.xlsx') or file_path.endswith('.xls'):
-        df = pd.read_excel(file_path)
-    else:
-        print(f"Unsupported file format: {file_path}")
-        return None
+    alcohol_csv = os.path.join(download_dir, "alcohol_consumption_by_usa_state_2024.csv")
+    chronic_csv = os.path.join(download_dir, "U.S._Chronic_Disease_Indicators.csv")
+    
+    return alcohol_csv, chronic_csv
 
-    # Basic data cleaning
-    df.columns = df.columns.str.strip()  # Strip leading/trailing spaces from column names
-    df = df.dropna()  # Drop rows with missing values
 
-    # Example transformation: Remove duplicate rows
-    df = df.drop_duplicates()
+def load_datasets(alcohol_csv, chronic_csv):
+    """
+    Load datasets from CSV files and return as DataFrames.
+    """
+    alcohol = pd.read_csv(alcohol_csv)
+    chronic = pd.read_csv(chronic_csv)
+    return alcohol, chronic
 
-    # Example transformation: Normalize column names to lowercase
-    df.columns = df.columns.str.lower()
 
-    return df
+def preprocess_alcohol_data(alcohol):
+    """
+    Preprocess the alcohol DataFrame while retaining all columns.
+    """
+    # Drop rows with missing values in critical columns
+    alcohol_cleaned = alcohol.dropna(subset=['Gallons of Ethanol per Capita'])
+    # Convert relevant columns to appropriate types (if necessary)
+    alcohol_cleaned['Gallons of Ethanol per Capita'] = alcohol_cleaned['Gallons of Ethanol per Capita'].astype(float)
+    return alcohol_cleaned
 
-# Placeholder: Replace with paths to your locally downloaded files
-dataset_paths = [
-    './data/diabetes.csv',  # Path to downloaded and extracted diabetes data
-    './data/chronic_disease.csv'  # Path to downloaded and extracted chronic disease data
-]
 
-# Process each dataset
-for path in dataset_paths:
-    if os.path.exists(path):
-        df = clean_and_transform_data(path)
-        if df is not None:
-            output_file = os.path.join(output_dir, os.path.basename(path))
-            df.to_csv(output_file, index=False)
-            print(f"Cleaned data saved to {output_file}")
-    else:
-        print(f"File {path} not found. Please download it manually from the specified Kaggle link.")
+def preprocess_chronic_data(chronic):
+    """
+    Preprocess the chronic disease DataFrame while retaining all columns.
+    """
+    # Drop rows with missing values in critical fields
+    chronic_cleaned = chronic.dropna(subset=['DataValue'])
+    
+    # Remove rows with specific footnotes
+    chronic_cleaned = chronic_cleaned[~chronic_cleaned['DatavalueFootnote'].isin(
+        ["No data available", "Data not shown because of too few respondents or cases"]
+    )]
+    
+    # Fill missing footnotes with an empty string
+    chronic_cleaned['DatavalueFootnote'] = chronic_cleaned['DatavalueFootnote'].fillna('')
+    
+    return chronic_cleaned
 
-print("Data processing complete.")
+
+def main():
+    try:
+        # Download Kaggle datasets
+        alcohol_csv, chronic_csv = download_kaggle_datasets()
+        
+        # Load datasets
+        alcohol, chronic = load_datasets(alcohol_csv, chronic_csv)
+        
+        # Preprocess datasets
+        alcohol_cleaned = preprocess_alcohol_data(alcohol)
+        chronic_cleaned = preprocess_chronic_data(chronic)
+        
+        # Save the preprocessed datasets
+        alcohol_output_csv = './data/alcohol_data.csv'
+        chronic_output_csv = './data/chronic_data.csv'
+
+        alcohol_cleaned.to_csv(alcohol_output_csv, index=False, encoding='utf-8-sig')
+        chronic_cleaned.to_csv(chronic_output_csv, index=False, encoding='utf-8-sig')
+
+        print(f"Alcohol data cleaned and saved as {alcohol_output_csv}")
+        print(f"Chronic disease data cleaned and saved as {chronic_output_csv}")
+        
+        # Return True to indicate success
+        return True
+    except Exception as e:
+        print(f"Pipeline execution failed: {e}")
+        return False
+
+
+if __name__ == "__main__":
+    main()
+

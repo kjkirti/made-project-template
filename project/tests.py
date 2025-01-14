@@ -1,67 +1,52 @@
 import unittest
-import warnings
-from ETL import extract, transform, load
+import os
+import pandas as pd
+import sqlite3
 from pipeline import main
 
-class TestExtractor(unittest.TestCase):
-    def __init__(self, methodName: str = ...):
-        super().__init__(methodName)
-        self.api_url_unemployment = "https://api.worldbank.org/v2/en/indicator/SL.UEM.TOTL.ZS?downloadformat=csv"
-        self.api_url_crime = "https://api.worldbank.org/v2/en/indicator/VC.IHR.PSRC.P5?downloadformat=csv"
-        self.download_path = r"D:\Github\made_ws24\data"  # Corrected raw string
 
-    def test_extract_unemployment_data(self):
-        result = extract.Extractor.extract_unemployment_data(self.api_url_unemployment, self.download_path)
-        self.assertTrue(result, "Fail")
+class TestDataPipeline(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        """
+        Set up the test environment by running the pipeline.
+        This ensures output files are generated before running tests.
+        """
+        print("Running data pipeline for testing...")
+        main()
 
-    def test_extract_crime_data(self):
-        result = extract.Extractor.extract_crime_data(self.api_url_crime, self.download_path)
-        self.assertTrue(result, "Fail")
+    def test_csv_file_exists(self):
+        """
+        Test if the output CSV files exist.
+        """
+        alcohol_file = "./data/alcohol_data.csv"
+        chronic_file = "./data/chronic_data.csv"
+        self.assertTrue(os.path.isfile(alcohol_file), f"{alcohol_file} does not exist")
+        self.assertTrue(os.path.isfile(chronic_file), f"{chronic_file} does not exist")
 
-class TestTransformer(unittest.TestCase):
-    def __init__(self, methodName: str = ...):
-        super().__init__(methodName)
-        self.t = transform.Transformer()
+    def test_csv_file_content(self):
+        """
+        Test if the output CSV files are not empty and contain data.
+        """
+        alcohol_file = "./data/alcohol_data.csv"
+        chronic_file = "./data/chronic_data.csv"
 
-    def test_null_values(self):
-        # Testing null values
-        self.t.transform_data_delete_null()
-        self.assertFalse(self.t.get_unemployment_data_not_null().isnull().values.any())
-        self.assertFalse(self.t.get_crime_data_not_null().isnull().values.any())
+        alcohol_df = pd.read_csv(alcohol_file, low_memory=False)
+        chronic_df = pd.read_csv(chronic_file, low_memory=False)
 
-    def test_transform_data(self):
-        self.t.sync_both_data()
-        # Testing columns of both dataframes are equal
-        self.assertTrue(
-            self.t.get_unemployment_data().columns.equals(self.t.get_crime_data().columns),
-            "Columns of both dataframes are not equal"
-        )
-        # Testing rows of both dataframes are equal
-        self.assertTrue(
-            self.t.get_unemployment_data().T.columns.equals(self.t.get_crime_data().T.columns),
-            "Rows of both dataframes are not equal"
-        )
+        self.assertFalse(alcohol_df.empty, f"{alcohol_file} is empty")
+        self.assertFalse(chronic_df.empty, f"{chronic_file} is empty")
+        self.assertTrue(len(alcohol_df) > 0, f"{alcohol_file} has no data rows")
+        self.assertTrue(len(chronic_df) > 0, f"{chronic_file} has no data rows")
 
-class TestLoader(unittest.TestCase):
-    def __init__(self, methodName: str = ...):
-        super().__init__(methodName)
-        self.t = transform.Transformer()
-        self.t.transform_data_delete_null()
-        self.t.sync_both_data()
-        self.output_file_u = r"D:\Github\made_ws24\data\unemployment.csv"  # Corrected raw string
-        self.output_file_c = r"D:\Github\made_ws24\data\crime.csv"  # Corrected raw string
 
-    def test_load_data_and_save(self):
-        resultu = load.Loader().load_data_and_save(self.t.get_unemployment_data(), self.output_file_u)
-        self.assertTrue(resultu, "Fail")
-        resultc = load.Loader().load_data_and_save(self.t.get_crime_data(), self.output_file_c)
-        self.assertTrue(resultc, "Fail")
+    def test_pipeline_output(self):
+        """
+        Test the pipeline's main function output.
+        """
+        result = main()
+        self.assertTrue(result, "Pipeline execution failed")
 
-class TestPipeline(unittest.TestCase):
-    def test_main(self):
-        m = main()
-        self.assertTrue(m, "Everything is not fine")
 
-if __name__ == '__main__':
-    warnings.filterwarnings("ignore")
+if __name__ == "__main__":
     unittest.main()
