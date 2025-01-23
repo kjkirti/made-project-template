@@ -1,3 +1,9 @@
+# Analyzing the Consumption and Health Risk Factors of Alcohol in the United States
+Alcohol consumption is a significant public health concern due to its wide-ranging effects on individuals and communities. Excessive alcohol use is associated with numerous adverse health outcomes, including renal failure, cardiovascular issues, and an increased risk of accidents. 
+
+Understanding trends in alcohol consumption and its implications on public health is vital for policy-making and societal well-being. This analysis aims to investigate the changes in alcohol consumption across U.S. states in 2024 and compare them with 2014, focusing on gallons of ethanol consumed per capita. Additionally, we explore driving fatalities involving alcohol and excessive drinking rates to identify actionable insights. 
+
+
 # Methods of Advanced Data Engineering Template Project
 
 This template project provides some structure for your open data project in the MADE module at FAU.
